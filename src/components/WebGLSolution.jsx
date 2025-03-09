@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { fragmentShaderSource, vertexShaderSource } from "../utils/utils";
 
 export const WebGLSolution = ({
   dimensions,
@@ -11,36 +12,6 @@ export const WebGLSolution = ({
   currentTime,
 }) => {
   const canvasRef = useRef(null);
-
-  // Updated vertex shader to handle point size
-  const vertexShaderSource = `
-    attribute vec2 a_position;
-    uniform vec2 u_resolution;
-    uniform float u_pointSize;
-    
-    void main() {
-      vec2 zeroToOne = a_position / u_resolution;
-      vec2 zeroToTwo = zeroToOne * 2.0;
-      vec2 clipSpace = zeroToTwo - 1.0;
-      gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
-      gl_PointSize = u_pointSize;
-    }
-  `;
-
-  // Updated fragment shader to draw circles
-  const fragmentShaderSource = `
-    precision mediump float;
-    uniform vec4 u_color;
-    
-    void main() {
-      vec2 center = gl_PointCoord - vec2(0.5, 0.5);
-      float dist = length(center);
-      if (dist > 0.5) {
-        discard;  // Makes points circular by discarding corner pixels
-      }
-      gl_FragColor = u_color;
-    }
-  `;
 
   const initGL = (gl) => {
     const vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -62,7 +33,7 @@ export const WebGLSolution = ({
 
   const drawRoutes = (gl) => {
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-    gl.clearColor(1, 1, 1, 1); // White background
+    gl.clearColor(1, 1, 1, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -77,7 +48,6 @@ export const WebGLSolution = ({
     const positionBuffer = gl.createBuffer();
 
     Object.entries(dataByDriverNo).forEach(([driverNo, points]) => {
-      // Convert points to WebGL coordinates
       const positions = points.flatMap((point) => [
         scaleCoordinate(
           point.longitude,
@@ -93,7 +63,6 @@ export const WebGLSolution = ({
         ),
       ]);
 
-      // Draw route
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       gl.bufferData(
         gl.ARRAY_BUFFER,
@@ -103,12 +72,10 @@ export const WebGLSolution = ({
       gl.enableVertexAttribArray(positionLocation);
       gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
-      // Set a fixed color for all routes
-      gl.uniform4f(colorLocation, 0.0, 0.0, 0.0, 0.5); // Black with 50% opacity
+      gl.uniform4f(colorLocation, 0.0, 0.0, 0.0, 0.5);
       gl.uniform1f(pointSizeLocation, 2.0);
       gl.drawArrays(gl.LINE_STRIP, 0, points.length);
 
-      // Draw current position
       const currentPoint =
         points.find((p) => p.date >= currentTime) || points[0];
       const currentPos = [
@@ -126,14 +93,13 @@ export const WebGLSolution = ({
         ),
       ];
 
-      // Draw current position as a circle
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       gl.bufferData(
         gl.ARRAY_BUFFER,
         new Float32Array(currentPos),
         gl.STATIC_DRAW
       );
-      gl.uniform4f(colorLocation, 0.0, 0.0, 0.0, 1.0); // Black with full opacity
+      gl.uniform4f(colorLocation, 0.0, 0.0, 0.0, 1.0);
       gl.uniform1f(pointSizeLocation, 10.0);
       gl.drawArrays(gl.POINTS, 0, 1);
     });
@@ -152,12 +118,7 @@ export const WebGLSolution = ({
       ref={canvasRef}
       width={dimensions.width}
       height={dimensions.height}
-      style={{
-        border: "1px solid black",
-        maxWidth: "100%",
-        height: "auto",
-        display: "block",
-      }}
+      className="webgl-solution"
     />
   );
 };

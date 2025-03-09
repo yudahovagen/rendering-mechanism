@@ -16,12 +16,7 @@ export const SvgSolution = ({
     <svg
       width={dimensions.width}
       height={dimensions.height}
-      style={{
-        border: "1px solid black",
-        maxWidth: "100%",
-        height: "auto",
-        display: "block",
-      }}
+      className="svg-solution"
       viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
       preserveAspectRatio="xMidYMid meet"
     >
@@ -36,15 +31,14 @@ export const SvgSolution = ({
             );
             const y = scaleCoordinate(
               point.latitude,
-              minLatitude.current, // min latitude
-              maxLatitude.current, // max latitude (note: swapped min/max)
+              minLatitude.current,
+              maxLatitude.current,
               dimensions.height
             );
             return `${index === 0 ? "M" : "L"} ${x} ${y}`;
           })
           .join(" ");
 
-        // Find current position based on timestamp
         const currentPoint =
           points.find((p) => p.date >= currentTime) || points[0];
 
@@ -65,25 +59,27 @@ export const SvgSolution = ({
           <g key={driverNo}>
             <path
               d={pathData}
-              stroke={`hsl(${parseInt(driverNo) * 137.508}deg, 70%, 50%)`}
-              strokeWidth={window.innerWidth < 400 ? "1" : "2"} // Thinner lines on mobile
+              className="svg-solution__path"
+              stroke={`hsl(${parseInt(driverNo)}deg, 70%, 50%)`}
+              strokeWidth={"1"}
               fill="none"
               opacity="0.5"
             />
             <circle
               cx={currentX}
               cy={currentY}
-              r={window.innerWidth < 400 ? "3" : "5"} // Smaller circles on mobile
-              fill={`hsl(${parseInt(driverNo) * 137.508}deg, 70%, 50%)`}
+              className="svg-solution__circle"
+              r={"3"}
+              fill={`hsl(${parseInt(driverNo)}deg, 70%, 50%)`}
               onMouseEnter={() => setHoveredDriver(driverNo)}
               onMouseLeave={() => setHoveredDriver(null)}
-              style={{ cursor: "pointer" }}
             />
             {hoveredDriver === driverNo && (
               <g>
                 <rect
                   x={currentX + 10}
                   y={currentY - 20}
+                  className="svg-solution__tooltip-rect"
                   width="60"
                   height="20"
                   fill="white"
@@ -94,6 +90,7 @@ export const SvgSolution = ({
                 <text
                   x={currentX + 40}
                   y={currentY - 5}
+                  className="svg-solution__tooltip-text"
                   textAnchor="middle"
                   fill="black"
                   fontSize="12"

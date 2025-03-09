@@ -12,24 +12,18 @@ export const CanvasSolution = ({
 }) => {
   const canvasRef = useRef(null);
 
-  // Draw function
   const draw = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
-    // Clear canvas
     ctx.clearRect(0, 0, dimensions.width, dimensions.height);
 
-    // Draw each driver's route and current position
     Object.entries(dataByDriverNo).forEach(([driverNo, points]) => {
-      // Generate a color for this driver
-      const hue = parseInt(driverNo) * 137.508;
-      const color = `hsl(${hue}deg, 70%, 50%)`;
+      const color = `hsl(${parseInt(driverNo)}deg, 70%, 50%)`;
 
-      // Draw the route
       ctx.beginPath();
       ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1;
       ctx.globalAlpha = 0.5;
 
       points.forEach((point, i) => {
@@ -54,7 +48,6 @@ export const CanvasSolution = ({
       });
       ctx.stroke();
 
-      // Draw current position
       const currentPoint =
         points.find((p) => p.date >= currentTime) || points[0];
       const currentX = scaleCoordinate(
@@ -78,7 +71,6 @@ export const CanvasSolution = ({
     });
   };
 
-  // Redraw when dimensions or currentTime changes
   useEffect(() => {
     draw();
   }, [dimensions, currentTime, dataByDriverNo]);
@@ -88,12 +80,7 @@ export const CanvasSolution = ({
       ref={canvasRef}
       width={dimensions.width}
       height={dimensions.height}
-      style={{
-        border: "1px solid black",
-        maxWidth: "100%",
-        height: "auto",
-        display: "block",
-      }}
+      className="canvas-solution"
     />
   );
 };
