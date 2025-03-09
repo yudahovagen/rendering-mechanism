@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { QuadTree, Rectangle } from "../utils/QuadTree";
 
 export const HybridSolution = ({
   dimensions,
@@ -18,108 +17,15 @@ export const HybridSolution = ({
   const [visibleDrivers, setVisibleDrivers] = useState(
     new Set(Object.keys(dataByDriverNo))
   );
-  const quadTreeRef = useRef(null);
   const glRef = useRef(null);
   const programRef = useRef(null);
   const [useWebGL, setUseWebGL] = useState(true);
-
-  // Initialize QuadTree
-  useEffect(() => {
-    const boundary = new Rectangle(0, 0, dimensions.width, dimensions.height);
-    quadTreeRef.current = new QuadTree(boundary, 4);
-    updateQuadTree();
-  }, [dimensions]);
-
-  // Update QuadTree with current positions
-  const updateQuadTree = useCallback(() => {
-    if (!quadTreeRef.current) return;
-
-    quadTreeRef.current = new QuadTree(
-      new Rectangle(0, 0, dimensions.width, dimensions.height),
-      4
-    );
-
-    // Add current positions to quadtree
-    Object.entries(dataByDriverNo).forEach(([driverNo, points]) => {
-      const currentPoint =
-        points.find((p) => p.date >= currentTime) || points[0];
-
-      const x = scaleCoordinate(
-        currentPoint.longitude,
-        minLongitude.current,
-        maxLongitude.current,
-        dimensions.width
-      );
-
-      const y = scaleCoordinate(
-        currentPoint.latitude,
-        minLatitude.current,
-        maxLatitude.current,
-        dimensions.height
-      );
-
-      quadTreeRef.current.insert({
-        x,
-        y,
-        data: { driverNo },
-      });
-    });
-  }, [
-    dimensions,
-    dataByDriverNo,
-    scaleCoordinate,
-    minLongitude,
-    maxLongitude,
-    minLatitude,
-    maxLatitude,
-    currentTime,
-  ]);
-
-  // Update QuadTree when time changes
-  useEffect(() => {
-    updateQuadTree();
-  }, [updateQuadTree, currentTime]);
-
-  // Get current positions of all drivers
-  const getCurrentPositions = useCallback(() => {
-    const positions = {};
-    Object.entries(dataByDriverNo).forEach(([driverNo, points]) => {
-      const currentPoint =
-        points.find((p) => p.date >= currentTime) || points[0];
-
-      const x = scaleCoordinate(
-        currentPoint.longitude,
-        minLongitude.current,
-        maxLongitude.current,
-        dimensions.width
-      );
-
-      const y = scaleCoordinate(
-        currentPoint.latitude,
-        minLatitude.current,
-        maxLatitude.current,
-        dimensions.height
-      );
-
-      positions[driverNo] = { x, y };
-    });
-
-    return positions;
-  }, [
-    dataByDriverNo,
-    scaleCoordinate,
-    minLongitude,
-    maxLongitude,
-    minLatitude,
-    maxLatitude,
-    dimensions,
-    currentTime,
-  ]);
 
   // Initialize WebGL context
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    console.log("initializing webgl");
 
     // Set canvas dimensions
     canvas.width = dimensions.width;
@@ -251,6 +157,7 @@ export const HybridSolution = ({
     return () => {
       // Clean up WebGL resources on unmount
       if (glRef.current && programRef.current) {
+        console.log("cleaning up webgl");
         glRef.current.deleteProgram(programRef.current);
         programRef.current = null;
       }
@@ -290,24 +197,15 @@ export const HybridSolution = ({
         gl.enableVertexAttribArray(positionLocation);
         gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
-        // Only draw visible routes
-        visibleDrivers.forEach((driverNo) => {
-          const driverData = dataByDriverNo[driverNo];
+        // Always render all routes
+        Object.values(dataByDriverNo).forEach((driverData) => {
           if (!driverData || driverData.length < 2) return;
 
-          // Find start point based on current time
-          let startIdx = 0;
-          for (let i = 0; i < driverData.length; i++) {
-            if (driverData[i].date >= currentTime) {
-              startIdx = Math.max(0, i - 1);
-              break;
-            }
-          }
-
+          // Draw the entire route, not just from current time
           // Create vertices for each line segment
           const vertices = [];
 
-          for (let i = startIdx; i < driverData.length - 1; i++) {
+          for (let i = 0; i < driverData.length - 1; i++) {
             // Convert to screen coordinates
             const x1 = scaleCoordinate(
               driverData[i].longitude,
@@ -341,6 +239,18 @@ export const HybridSolution = ({
             const scaledY1 = centerY + (y1 - centerY) * scale + pan.y;
             const scaledX2 = centerX + (x2 - centerX) * scale + pan.x;
             const scaledY2 = centerY + (y2 - centerY) * scale + pan.y;
+
+            // Skip segments that are completely outside the viewport with a large margin
+            if (
+              (scaledX1 < -200 && scaledX2 < -200) ||
+              (scaledX1 > dimensions.width + 200 &&
+                scaledX2 > dimensions.width + 200) ||
+              (scaledY1 < -200 && scaledY2 < -200) ||
+              (scaledY1 > dimensions.height + 200 &&
+                scaledY2 > dimensions.height + 200)
+            ) {
+              continue;
+            }
 
             // Line thickness based on zoom
             const lineWidth = Math.max(1, Math.min(3, scale));
@@ -380,10 +290,8 @@ export const HybridSolution = ({
               gl.STATIC_DRAW
             );
 
-            // Set color
-            const hue = parseInt(driverNo) * 137.508; // Same coloring as SVG
-            const [r, g, b] = hslToRgb(hue, 0.7, 0.5);
-            gl.uniform4f(colorLocation, r, g, b, 0.7);
+            // Set color to black with 0.7 opacity
+            gl.uniform4f(colorLocation, 0.0, 0.0, 0.0, 0.7);
 
             // Draw triangles
             gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2);
@@ -403,22 +311,12 @@ export const HybridSolution = ({
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Only draw visible routes
-      visibleDrivers.forEach((driverNo) => {
-        const driverData = dataByDriverNo[driverNo];
+      // Always render all routes
+      Object.values(dataByDriverNo).forEach((driverData) => {
         if (!driverData || driverData.length < 2) return;
 
-        // Find start point based on current time
-        let startIdx = 0;
-        for (let i = 0; i < driverData.length; i++) {
-          if (driverData[i].date >= currentTime) {
-            startIdx = Math.max(0, i - 1);
-            break;
-          }
-        }
-
-        // Draw line segments
-        for (let i = startIdx; i < driverData.length - 1; i++) {
+        // Draw the entire route, not just from current time
+        for (let i = 0; i < driverData.length - 1; i++) {
           // Convert to screen coordinates
           const x1 = scaleCoordinate(
             driverData[i].longitude,
@@ -453,9 +351,20 @@ export const HybridSolution = ({
           const scaledX2 = centerX + (x2 - centerX) * scale + pan.x;
           const scaledY2 = centerY + (y2 - centerY) * scale + pan.y;
 
+          // Skip segments that are completely outside the viewport with a large margin
+          if (
+            (scaledX1 < -200 && scaledX2 < -200) ||
+            (scaledX1 > dimensions.width + 200 &&
+              scaledX2 > dimensions.width + 200) ||
+            (scaledY1 < -200 && scaledY2 < -200) ||
+            (scaledY1 > dimensions.height + 200 &&
+              scaledY2 > dimensions.height + 200)
+          ) {
+            continue;
+          }
+
           // Draw line
-          const hue = parseInt(driverNo) * 137.508;
-          ctx.strokeStyle = `hsla(${hue}, 70%, 50%, 0.7)`;
+          ctx.strokeStyle = "rgba(0, 0, 0, 0.7)";
           ctx.lineWidth = Math.max(1, Math.min(3, scale));
           ctx.beginPath();
           ctx.moveTo(scaledX1, scaledY1);
@@ -473,43 +382,15 @@ export const HybridSolution = ({
     maxLatitude,
     scale,
     pan,
-    visibleDrivers,
     currentTime,
     useWebGL,
+    scaleCoordinate,
   ]);
 
-  // Helper function to convert HSL to RGB for WebGL
-  const hslToRgb = useCallback((h, s, l) => {
-    h /= 360;
-    let r, g, b;
-
-    if (s === 0) {
-      r = g = b = l; // achromatic
-    } else {
-      const hue2rgb = (p, q, t) => {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1 / 6) return p + (q - p) * 6 * t;
-        if (t < 1 / 2) return q;
-        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-        return p;
-      };
-
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-
-      r = hue2rgb(p, q, h + 1 / 3);
-      g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1 / 3);
-    }
-
-    return [r, g, b];
-  }, []);
-
   // Update visibility based on current view
-  const updateVisibility = useCallback(() => {
-    // If not zoomed, show all drivers
-    if (scale <= 1) {
+  const updateVisibility = () => {
+    // Only filter drivers when zoomed in significantly
+    if (scale <= 1.05) {
       setVisibleDrivers(new Set(Object.keys(dataByDriverNo)));
       return;
     }
@@ -525,29 +406,48 @@ export const HybridSolution = ({
     const visibleBottom =
       (dimensions.height - pan.y - centerY) / scale + centerY;
 
-    // Add margin to prevent drivers from disappearing too early (30% of screen)
-    const marginX = (visibleRight - visibleLeft) * 0.3;
-    const marginY = (visibleBottom - visibleTop) * 0.3;
+    // Increase margin to prevent drivers from disappearing too early (100% of screen instead of 50%)
+    const marginX = (visibleRight - visibleLeft) * 1.0;
+    const marginY = (visibleBottom - visibleTop) * 1.0;
 
     const expandedLeft = visibleLeft - marginX;
     const expandedTop = visibleTop - marginY;
     const expandedRight = visibleRight + marginX;
     const expandedBottom = visibleBottom + marginY;
 
-    // Use quadtree to find visible drivers efficiently
-    const visibleRange = new Rectangle(
-      expandedLeft,
-      expandedTop,
-      expandedRight - expandedLeft,
-      expandedBottom - expandedTop
-    );
-
-    const visiblePoints = quadTreeRef.current.query(visibleRange);
-
     // Collect visible drivers
     const newVisibleDrivers = new Set();
-    visiblePoints.forEach((point) => {
-      newVisibleDrivers.add(point.data.driverNo);
+    Object.entries(dataByDriverNo).forEach(([driverNo, driverData]) => {
+      const currentPoint =
+        driverData.find((p) => p.date >= currentTime) || driverData[0];
+
+      const x = scaleCoordinate(
+        currentPoint.longitude,
+        minLongitude.current,
+        maxLongitude.current,
+        dimensions.width
+      );
+
+      const y = scaleCoordinate(
+        currentPoint.latitude,
+        minLatitude.current,
+        maxLatitude.current,
+        dimensions.height
+      );
+
+      // Apply zoom and pan
+      const scaledX = centerX + (x - centerX) * scale + pan.x;
+      const scaledY = centerY + (y - centerY) * scale + pan.y;
+
+      // Check if driver is within visible area with expanded bounds
+      if (
+        scaledX >= expandedLeft &&
+        scaledX <= expandedRight &&
+        scaledY >= expandedTop &&
+        scaledY <= expandedBottom
+      ) {
+        newVisibleDrivers.add(driverNo);
+      }
     });
 
     // If no drivers are visible, show all of them
@@ -556,33 +456,51 @@ export const HybridSolution = ({
     } else {
       setVisibleDrivers(newVisibleDrivers);
     }
-  }, [scale, pan, dimensions, dataByDriverNo, quadTreeRef]);
+  };
 
   // Update visibility when zoom or pan changes
   useEffect(() => {
     updateVisibility();
-  }, [scale, pan, updateVisibility]);
+  }, [dimensions, scale, pan, currentTime]);
 
-  // Draw routes when visibility or data changes
+  // Only redraw routes when necessary
   useEffect(() => {
     drawRoutes();
-  }, [
-    visibleDrivers,
-    dataByDriverNo,
-    currentTime,
-    scale,
-    pan,
-    dimensions,
-    drawRoutes,
-  ]);
+  }, [dimensions, scale, pan, useWebGL, currentTime, drawRoutes]);
 
   // Zoom handlers
   function handleZoomIn() {
-    setScale((prevScale) => prevScale * 1.5);
+    // Calculate the new scale
+    const newScale = scale * 1.2;
+
+    // Calculate the new pan to keep the center point fixed
+    const newPanX = pan.x * 1.2;
+    const newPanY = pan.y * 1.2;
+
+    // Update state
+    setScale(newScale);
+    setPan({ x: newPanX, y: newPanY });
   }
 
   function handleZoomOut() {
-    setScale((prevScale) => Math.max(1, prevScale / 1.5));
+    // Calculate the new scale, but don't go below 1
+    const newScale = Math.max(1, scale / 1.2);
+
+    // Only adjust pan if we're actually changing the scale
+    if (newScale !== scale) {
+      // Calculate the new pan to keep the center point fixed
+      const newPanX = pan.x / 1.2;
+      const newPanY = pan.y / 1.2;
+
+      // Update state
+      setScale(newScale);
+      setPan({ x: newPanX, y: newPanY });
+    } else {
+      // Just update the scale
+      setScale(newScale);
+      // Reset pan when reaching minimum zoom
+      setPan({ x: 0, y: 0 });
+    }
   }
 
   // Pan handlers
@@ -601,9 +519,6 @@ export const HybridSolution = ({
   function moveRight() {
     setPan((prevPan) => ({ ...prevPan, x: prevPan.x - 50 }));
   }
-
-  // Get current positions for rendering
-  const driverPositions = getCurrentPositions();
 
   return (
     <div
@@ -639,14 +554,29 @@ export const HybridSolution = ({
         }}
       >
         {Array.from(visibleDrivers).map((driverNo) => {
-          const position = driverPositions[driverNo];
-          if (!position) return null;
+          const currentPoint =
+            dataByDriverNo[driverNo].find((p) => p.date >= currentTime) ||
+            dataByDriverNo[driverNo][0];
+
+          const x = scaleCoordinate(
+            currentPoint.longitude,
+            minLongitude.current,
+            maxLongitude.current,
+            dimensions.width
+          );
+
+          const y = scaleCoordinate(
+            currentPoint.latitude,
+            minLatitude.current,
+            maxLatitude.current,
+            dimensions.height
+          );
 
           // Apply zoom and pan
           const centerX = dimensions.width / 2;
           const centerY = dimensions.height / 2;
-          const scaledX = centerX + (position.x - centerX) * scale + pan.x;
-          const scaledY = centerY + (position.y - centerY) * scale + pan.y;
+          const scaledX = centerX + (x - centerX) * scale + pan.x;
+          const scaledY = centerY + (y - centerY) * scale + pan.y;
 
           // Check if driver is within visible area
           if (
@@ -658,8 +588,6 @@ export const HybridSolution = ({
             return null;
           }
 
-          const hue = parseInt(driverNo) * 137.508;
-
           return (
             <g
               key={driverNo}
@@ -670,7 +598,7 @@ export const HybridSolution = ({
             >
               <circle
                 r={hoveredDriver === driverNo ? 8 : 6}
-                fill={`hsl(${hue}, 70%, 50%)`}
+                fill={`hsl(${parseInt(driverNo) * 137.508}, 70%, 50%)`}
                 stroke="#fff"
                 strokeWidth="2"
               />

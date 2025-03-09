@@ -88,7 +88,7 @@ export const App = () => {
         console.error("Error fetching mock data:", error);
       }
     };
-
+    console.log("fetching data");
     fetchData();
   }, []);
 
@@ -97,6 +97,7 @@ export const App = () => {
     let animationFrame;
 
     if (isPlaying) {
+      console.log("animating");
       const animate = () => {
         setCurrentTime((prev) => {
           const nextTime = prev + speed * 1000; // speed * 1000ms
@@ -119,6 +120,7 @@ export const App = () => {
   // Add resize handler
   useEffect(() => {
     const handleResize = () => {
+      console.log("resizing");
       setDimensions({
         width: Math.min(window.innerWidth - 40, 800),
         height: Math.min(window.innerHeight - 200, 600),
@@ -223,9 +225,9 @@ export const App = () => {
         >
           <input
             type="range"
-            min="0.01"
-            max="1"
-            step="0.01"
+            min="0.001"
+            max="0.1"
+            step="0.001"
             value={speed}
             onChange={(e) => setSpeed(parseFloat(e.target.value))}
             style={{
