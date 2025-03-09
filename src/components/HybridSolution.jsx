@@ -11,6 +11,7 @@ export const HybridSolution = ({
   currentTime,
 }) => {
   const canvasRef = useRef(null);
+  const zoomInMaxLevel = useRef(10); // Maximum zoom in level
   const [hoveredDriver, setHoveredDriver] = useState(null);
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -165,7 +166,7 @@ export const HybridSolution = ({
   }, [dimensions]);
 
   // Draw routes on canvas
-  const drawRoutes = useCallback(() => {
+  const drawRoutes = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -373,22 +374,10 @@ export const HybridSolution = ({
         }
       });
     }
-  }, [
-    dataByDriverNo,
-    dimensions,
-    minLongitude,
-    maxLongitude,
-    minLatitude,
-    maxLatitude,
-    scale,
-    pan,
-    currentTime,
-    useWebGL,
-    scaleCoordinate,
-  ]);
+  };
 
   // Update visibility based on current view
-  const updateVisibility = () => {
+  const updateVisibility = useCallback(() => {
     // Only filter drivers when zoomed in significantly
     if (scale <= 1.05) {
       setVisibleDrivers(new Set(Object.keys(dataByDriverNo)));
@@ -456,68 +445,91 @@ export const HybridSolution = ({
     } else {
       setVisibleDrivers(newVisibleDrivers);
     }
-  };
+  }, [dimensions, scale, pan, currentTime]);
 
   // Update visibility when zoom or pan changes
   useEffect(() => {
     updateVisibility();
-  }, [dimensions, scale, pan, currentTime]);
+  }, [updateVisibility]);
 
   // Only redraw routes when necessary
   useEffect(() => {
     drawRoutes();
-  }, [dimensions, scale, pan, useWebGL, currentTime, drawRoutes]);
+  }, [dimensions, scale, pan, useWebGL]);
 
   // Zoom handlers
-  function handleZoomIn() {
-    // Calculate the new scale
+  const handleZoomIn = () => {
     const newScale = scale * 1.2;
+    // Check if new scale would exceed max zoom level
+    if (newScale > zoomInMaxLevel.current) return;
 
     // Calculate the new pan to keep the center point fixed
     const newPanX = pan.x * 1.2;
     const newPanY = pan.y * 1.2;
 
-    // Update state
     setScale(newScale);
     setPan({ x: newPanX, y: newPanY });
-  }
+  };
 
-  function handleZoomOut() {
-    // Calculate the new scale, but don't go below 1
+  const handleZoomOut = () => {
     const newScale = Math.max(1, scale / 1.2);
 
-    // Only adjust pan if we're actually changing the scale
-    if (newScale !== scale) {
+    if (newScale === 1) {
+      setScale(newScale);
+      setPan({ x: 0, y: 0 });
+    } else {
       // Calculate the new pan to keep the center point fixed
       const newPanX = pan.x / 1.2;
       const newPanY = pan.y / 1.2;
 
-      // Update state
       setScale(newScale);
       setPan({ x: newPanX, y: newPanY });
-    } else {
-      // Just update the scale
-      setScale(newScale);
-      // Reset pan when reaching minimum zoom
-      setPan({ x: 0, y: 0 });
     }
+  };
+
+  // Helper function to check if new pan position is within bounds
+  function isWithinBounds(newPanX, newPanY) {
+    const maxPanX = (dimensions.width * (scale - 1)) / 2;
+    const maxPanY = (dimensions.height * (scale - 1)) / 2;
+
+    return Math.abs(newPanX) <= maxPanX && Math.abs(newPanY) <= maxPanY;
   }
 
-  // Pan handlers
+  // Pan handlers with bounds checking
   function moveUp() {
-    setPan((prevPan) => ({ ...prevPan, y: prevPan.y + 50 }));
+    setPan((prevPan) => {
+      const newPanY = prevPan.y + 50;
+      return isWithinBounds(prevPan.x, newPanY)
+        ? { ...prevPan, y: newPanY }
+        : prevPan;
+    });
   }
 
   function moveDown() {
-    setPan((prevPan) => ({ ...prevPan, y: prevPan.y - 50 }));
+    setPan((prevPan) => {
+      const newPanY = prevPan.y - 50;
+      return isWithinBounds(prevPan.x, newPanY)
+        ? { ...prevPan, y: newPanY }
+        : prevPan;
+    });
   }
 
   function moveLeft() {
-    setPan((prevPan) => ({ ...prevPan, x: prevPan.x + 50 }));
+    setPan((prevPan) => {
+      const newPanX = prevPan.x + 50;
+      return isWithinBounds(newPanX, prevPan.y)
+        ? { ...prevPan, x: newPanX }
+        : prevPan;
+    });
   }
 
   function moveRight() {
-    setPan((prevPan) => ({ ...prevPan, x: prevPan.x - 50 }));
+    setPan((prevPan) => {
+      const newPanX = prevPan.x - 50;
+      return isWithinBounds(newPanX, prevPan.y)
+        ? { ...prevPan, x: newPanX }
+        : prevPan;
+    });
   }
 
   return (

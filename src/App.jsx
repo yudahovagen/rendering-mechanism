@@ -235,7 +235,9 @@ export const App = () => {
               maxWidth: "200px",
             }}
           />
-          <span style={{ minWidth: "80px" }}>Speed: {speed}x</span>
+          <span style={{ minWidth: "80px" }}>
+            Speed: {parseFloat((speed * 10).toFixed(2))}x
+          </span>
         </div>
       </div>
 
