@@ -21,12 +21,12 @@ export const HybridSolution = ({
   const glRef = useRef(null);
   const programRef = useRef(null);
   const [useWebGL, setUseWebGL] = useState(true);
+  const visibleDriversRef = useRef(new Set());
 
   // Initialize WebGL context
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    console.log("initializing webgl");
 
     // Set canvas dimensions
     canvas.width = dimensions.width;
@@ -148,8 +148,6 @@ export const HybridSolution = ({
 
       // Store program for later use
       programRef.current = program;
-
-      console.log("WebGL initialized successfully");
     } catch (error) {
       console.error("Error initializing WebGL:", error);
       setUseWebGL(false);
@@ -158,7 +156,6 @@ export const HybridSolution = ({
     return () => {
       // Clean up WebGL resources on unmount
       if (glRef.current && programRef.current) {
-        console.log("cleaning up webgl");
         glRef.current.deleteProgram(programRef.current);
         programRef.current = null;
       }
@@ -405,8 +402,7 @@ export const HybridSolution = ({
     const expandedBottom = visibleBottom + marginY;
 
     // Collect visible drivers
-    const newVisibleDrivers = new Set();
-    Object.entries(dataByDriverNo).forEach(([driverNo, driverData]) => {
+    for (const [driverNo, driverData] of Object.entries(dataByDriverNo)) {
       const currentPoint =
         driverData.find((p) => p.date >= currentTime) || driverData[0];
 
@@ -435,15 +431,22 @@ export const HybridSolution = ({
         scaledY >= expandedTop &&
         scaledY <= expandedBottom
       ) {
-        newVisibleDrivers.add(driverNo);
+        // check if driver is already in the set
+        if (!visibleDriversRef.current.has(driverNo)) {
+          visibleDriversRef.current.add(driverNo);
+        }
+      } else {
+        if (visibleDriversRef.current.has(driverNo)) {
+          visibleDriversRef.current.delete(driverNo);
+        }
       }
-    });
+    }
 
     // If no drivers are visible, show all of them
-    if (newVisibleDrivers.size === 0) {
+    if (visibleDriversRef.current.size === 0) {
       setVisibleDrivers(new Set(Object.keys(dataByDriverNo)));
     } else {
-      setVisibleDrivers(newVisibleDrivers);
+      setVisibleDrivers(visibleDriversRef.current);
     }
   }, [dimensions, scale, pan, currentTime]);
 
@@ -538,7 +541,7 @@ export const HybridSolution = ({
         position: "relative",
         width: dimensions.width,
         height: dimensions.height,
-        border: "1px solid red", // Debug border to see container
+        border: "1px solid black",
       }}
     >
       <canvas
@@ -550,7 +553,6 @@ export const HybridSolution = ({
           top: 0,
           left: 0,
           pointerEvents: "none",
-          border: "1px solid blue", // Debug border to see canvas
         }}
       />
 
@@ -562,7 +564,6 @@ export const HybridSolution = ({
           top: 0,
           left: 0,
           pointerEvents: "all",
-          border: "1px solid green", // Debug border to see SVG
         }}
       >
         {Array.from(visibleDrivers).map((driverNo) => {
@@ -611,8 +612,6 @@ export const HybridSolution = ({
               <circle
                 r={hoveredDriver === driverNo ? 8 : 6}
                 fill={`hsl(${parseInt(driverNo) * 137.508}, 70%, 50%)`}
-                stroke="#fff"
-                strokeWidth="2"
               />
               <text
                 x="10"

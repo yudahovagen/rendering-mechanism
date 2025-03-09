@@ -20,7 +20,7 @@ export const SvgSolution = ({
         border: "1px solid black",
         maxWidth: "100%",
         height: "auto",
-        display: "block", // Removes extra space below SVG
+        display: "block",
       }}
       viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
       preserveAspectRatio="xMidYMid meet"
@@ -30,8 +30,8 @@ export const SvgSolution = ({
           .map((point, index) => {
             const x = scaleCoordinate(
               point.longitude,
-              minLongitude.current, // min longitude
-              maxLongitude.current, // max longitude
+              minLongitude.current,
+              maxLongitude.current,
               dimensions.width
             );
             const y = scaleCoordinate(

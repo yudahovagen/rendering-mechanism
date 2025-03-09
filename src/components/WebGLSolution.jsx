@@ -42,33 +42,6 @@ export const WebGLSolution = ({
     }
   `;
 
-  // HSL to RGB conversion function
-  const hslToRgb = (h, s, l) => {
-    let r, g, b;
-
-    if (s === 0) {
-      r = g = b = l;
-    } else {
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-
-      const hue2rgb = (p, q, t) => {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1 / 6) return p + (q - p) * 6 * t;
-        if (t < 1 / 2) return q;
-        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-        return p;
-      };
-
-      r = hue2rgb(p, q, h + 1 / 3);
-      g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1 / 3);
-    }
-
-    return [r, g, b];
-  };
-
   const initGL = (gl) => {
     const vertexShader = gl.createShader(gl.VERTEX_SHADER);
     gl.shaderSource(vertexShader, vertexShaderSource);
@@ -120,10 +93,6 @@ export const WebGLSolution = ({
         ),
       ]);
 
-      // Calculate color using the same formula as other solutions
-      const hue = (parseInt(driverNo) * 137.508) / 360;
-      const [r, g, b] = hslToRgb(hue, 0.7, 0.5);
-
       // Draw route
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       gl.bufferData(
@@ -134,8 +103,8 @@ export const WebGLSolution = ({
       gl.enableVertexAttribArray(positionLocation);
       gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
-      // Set color and draw route with transparency
-      gl.uniform4f(colorLocation, r, g, b, 0.5);
+      // Set a fixed color for all routes
+      gl.uniform4f(colorLocation, 0.0, 0.0, 0.0, 0.5); // Black with 50% opacity
       gl.uniform1f(pointSizeLocation, 2.0);
       gl.drawArrays(gl.LINE_STRIP, 0, points.length);
 
@@ -164,7 +133,7 @@ export const WebGLSolution = ({
         new Float32Array(currentPos),
         gl.STATIC_DRAW
       );
-      gl.uniform4f(colorLocation, r, g, b, 1.0);
+      gl.uniform4f(colorLocation, 0.0, 0.0, 0.0, 1.0); // Black with full opacity
       gl.uniform1f(pointSizeLocation, 10.0);
       gl.drawArrays(gl.POINTS, 0, 1);
     });
